@@ -1,6 +1,4 @@
-PATH=$PATH:$(cygpath 'c:/stuff/maven/bin/')
-
-export PATH
+#!/bin/bash
 
 do_gensrc() { ## generate sources
 	mvn generate-sources

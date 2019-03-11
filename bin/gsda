@@ -18,5 +18,5 @@ then
 	exit 2
 fi
 
-java -cp $(cygpath -w ${USE_JAR}) com.gs.Script +o +g +a "${2}" -b "${1}"
+java -cp ${USE_JAR} com.gs.Script +o +g +a "${2}" -b "${1}"
 
