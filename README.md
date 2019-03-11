@@ -98,7 +98,7 @@ after decompilation yields:
 
 ```
 
-This is, unfortunately, one directional operation - there is no way to generate executable code from such output.
+This is, unfortunately, unidirectional operation - there is no way to generate executable code from this output.
 
 ## Generating PNG or SVG files
 
