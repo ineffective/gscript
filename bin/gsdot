@@ -43,7 +43,7 @@ echo "Processing file $fileName"
 
 tmpfp=$(pathTransform /tmp/gssc-temp-out)
 
-gsr -q +d "${tmpfp}" -f "${fileName}" 
+$(dirname $(readlink -f "$0"))/gsr -q +d "${tmpfp}" -f "${fileName}" 
 
 fn=$(basename "${fileName}")
 

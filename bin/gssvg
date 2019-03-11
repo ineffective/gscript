@@ -2,5 +2,5 @@
 
 [ -z "$1" ] || [ ! -f "$1" ] && echo File name $1 is invalid. && exit 1
 
-gsdot --type svg --file "$1"
+$(dirname $(readlink -f "$0"))/gsdot --type svg --file "$1"
 
