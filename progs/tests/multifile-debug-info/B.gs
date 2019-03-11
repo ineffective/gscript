@@ -1,0 +1,3 @@
+def fileB() {
+	fileA();
+}

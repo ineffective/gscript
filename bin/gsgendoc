@@ -1,0 +1,24 @@
+#!/bin/bash
+
+[ ! -f "src/main/parser/script.grammar" ] && { echo "File script.grammar not found in src/main/parser. Please run from project's root directory"; exit 1; }
+
+grep -E '^[a-z]|^[ ]{4}[=|]' src/main/parser/script.grammar   | sed 's/{:.*//' | sed 's![.][a-z]\+!!g' | tr -d '=|' > tempor
+
+echo '<html><head /> <body>' > grammar.html 
+
+gawk '
+	/^[a-z]/ { printf("<h2 id=\"%s\">%s</h2></br>\n", $1, $1); next;} 
+	{ print"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"; for (x = 1 ; x <= NF ; x = x + 1) { if ($x ~ /^[a-z_]+$/) { printf(" <a href=\"#%s\">%s</a>", $x, $x); } else { printf(" %s", $x); }} ;print "</br>\n"; next;}
+' < tempor >> grammar.html 
+
+echo '</body>' >> grammar.html
+
+rm tempor
+
+pattern=$(grep -E '^[a-z]|^[ ]{4}[=|]' src/main/parser/script.grammar   | sed 's/{:.*//' | sed 's![.][a-z]\+!!g' | tr -d '=|' | tr ' ' '
+' | grep -vE '^$' | sort | uniq | tr '
+' '|' | sed 's!|$!!')
+
+
+( sed -r 's/('"${pattern}"')/<span style="color:blue;">\1<\/span>/g' | sed 's!$!<br />!' | sed 's/	/    /g' | sed 's/  /\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;/g' ; ) < src/main/parser/script.grammar > grammar2.html
+

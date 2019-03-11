@@ -1,0 +1,124 @@
+<?xml version="1.0"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	</properties>
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.gs</groupId>
+	<artifactId>gamescript</artifactId>
+	<packaging>jar</packaging>
+	<version>1.0</version>
+	<name>gamescript</name>
+	<url>http://maven.apache.org</url>
+	<build>
+		<finalName>gamescript</finalName>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>2.4</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<transformers>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<manifestEntries>
+										<Main-Class>com.gs.Script</Main-Class>
+										<Build-Number>5</Build-Number>
+									</manifestEntries>
+								</transformer>
+							</transformers>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.1</version>
+				<configuration>
+					<source>1.7</source>
+					<target>1.7</target>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>de.jflex</groupId>
+				<artifactId>maven-jflex-plugin</artifactId>
+				<version>1.4.3</version>
+				<executions>
+					<execution>
+						<phase >generate-sources</phase>
+						<goals>
+							<goal>generate</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>src/main/java/</outputDirectory>
+							<lexDefinitions>
+								<lexDefinition>src/main/parser</lexDefinition>
+							</lexDefinitions>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>1.7</version>
+				<executions>
+					<execution>
+						<phase>generate-sources</phase>
+						<configuration>
+							<target>
+								<taskdef name="beaver" classname="beaver.comp.run.AntTask"
+									classpathref="maven.compile.classpath" />
+								<property name="beaver.available" value="yes" />
+								<beaver file="src/main/parser/script.grammar" destdir="src/main/java"
+									compress="yes" exportTables="no" sortTerminals="no"
+									terminalNames="no" exportTerminals="no" useSwitch="no"
+									anonymousActions="yes" reportActions="no" />
+							</target>
+						</configuration>
+						<goals>
+							<goal>run</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<artifactId>maven-clean-plugin</artifactId>
+				<version>2.5</version>
+				<configuration>
+					<filesets>
+						<fileset>
+							<directory>src/main/java/com/gs/parser</directory>
+							<includes>
+								<include>GameScriptParser.java</include>
+								<include>GameScriptScanner.java</include>
+							</includes>
+							<followSymlinks>false</followSymlinks>
+						</fileset>
+					</filesets>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+	<dependencies>
+		<dependency>
+			<artifactId>beaver-ant</artifactId>
+			<groupId>net.sf.beaver</groupId>
+			<version>0.9.11</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<artifactId>beaver-rt</artifactId>
+			<groupId>net.sf.beaver</groupId>
+			<version>0.9.11</version>
+			<scope>runtime</scope>
+		</dependency>
+	</dependencies>
+</project>

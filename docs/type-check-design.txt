@@ -1,0 +1,406 @@
+1. Idea
+-------
+
+What we want:
+  a) Type inference
+  b) Static type checking
+
+What tools do we have:
+  i) we start with AST
+  ii) each node will be augmented with some data structure describing type this node has
+    ii.i) we're not talking CallNode, VarNode, but rather Integer, Boolean, F(Integer, Integer) => Integer (so function that takes two integers and returns integer)
+  iii) we need some tag type meaning "whatever works, man".
+
+I think we should take our program and augment Nodes with type information. Let's try it:
+
+EXAMPLE:
+========
+
+def main() {
+	return 1;
+}
+
+T(main) = F() => ANY
+T(return 1) = Integer
+
+But if we have return, then we also should change type of current function to T(return...), so:
+
+T(main) = F() => Integer
+
+Ok, that was easy. Now harder.
+
+EXAMPLE:
+========
+
+def f(a, b) { return a + b; }
+
+def main() {
+	return f("a", 1);
+}
+
+We walk through f:
+
+T(f) = F(T(a), T(b)) => ANY
+T(a) = ANY
+T(b) = ANY
+
+Next, we have 'return a + b'
+
+At this point, T(a) = ANY, T(b) = ANY. Let's see how it plays with '+':
+
+T(+) = F(T1 = [I, S, B, D], T2 = [I, S, B, D]) => Combine('+', T1, T2)
+
+We look at it and what do we have? Well, T(a) is broader than T1 and T(b) is broader than T2.
+
+So what do we do? Well, we set:
+
+T(a) = ANY ^ T1
+T(b) = ANY ^ T2
+
+so:
+
+T(a) = [I, S, B, D]
+T(b) = [I, S, B, D]
+
+In the end:
+
+T(a + b) = Combine('+', T(a), T(b))
+
+T(return) = T(a + b) = Combine('+', T(a), T(b))
+
+Since we have 'return', so we must check/fix/augment/repair return type of current function, so of 'f'.
+
+R(f) = R(f) ^ T(return a + b) = ANY ^ Combine('+', T(a), T(b))
+
+So in the end we have:
+
+T(f) = F(T(a), T(b)) => Combine('+', T(a), T(b)) = F(T1 = [I, S, B, D], T2 = [I, S, B, D]) => Combine('+', T1, T2)
+
+Now, onward to 'main':
+
+T(main) = F() => ANY
+
+We have 'return ', so let's check it's type:
+
+T(return f("a", 1)) = T(f("a", 1)) = ?
+
+Since it's function application, let's check arguments versus function type. We have:
+
+T("a") = String
+T(1) = Integer
+T(f) = see above.
+
+First, let's see if arguments have proper types:
+
+String in F.T1? Yes.
+Integer in F.T2? Yes.
+
+So yes, arguments are fine.
+
+Now, let's check if return type can be deduced:
+
+Combine('+', String, Integer) gives as a result Integer. So everything is fine, let's set 'main' return type:
+
+T(main) = F() => Integer
+
+EXAMPLE:
+========
+
+def main() { // T(main) = F() => ANY
+	a = 1; // T(a) = T(1) = Integer
+	b = 2; // T(b) = T(2) = Integer
+	return a + b; // T(return) = T(a + b) = Combine('+', T(a), T(b) = Combine('+', Integer, Integer) = Integer; T(main) = F() => T(return) = F() => Integer
+}
+
+
+EXAMPLE:
+========
+
+def f(a) {
+	// T(a) = ANY; T(f) = F(T(a)) =>  ANY;
+
+        return \() { // to get return type of this, we must get type of lambda, which means type of "return a()"
+
+		return a();
+
+		// T(return a()) = T(a())
+		// Now, to get T(a()), we must check if T(a) matches this type here, so:
+		//
+		// isOfType(ANY, F() => ANY)
+		//
+		// so check if T(a) == F() => ANY, ANY == F() => ANY, yes, but also T(a) must be at least that, so:
+		// T(a) = F() => ANY
+		// so T(f_lam0) = R(a)
+	}
+
+	// T(return) = T(\() { return a(); }) = F() => T(return a()) = F() => T(a()) = F() => R(a)
+	// So we return:
+	// T(a()) = R(a) - since we have T(a) = F() => ANY and application gives 'R' as result.
+	// so T(return) = F() => R(a)
+	// and end result is:
+	// T(f) = F(T(a)) => (F() => R(a)) 
+	// T(f) = F(F() => ANY) => (F() => R(a))
+}
+
+def main() {
+        return f(\() { return 1; })();
+}
+
+Let's rewrite for easier maintenance:
+
+def main() {
+	t3 = \() { return 1; };
+	t2 = f(t3);
+	t1 = t2();
+	return t1;
+}
+
+T(main) = F() => ANY
+
+T(t3) = T(\() { return 1; }) = F() => T(return 1) = F() => T(1) = F() => Integer
+T(t3) = F() => Integer
+// now, if we have call, let's check whether we can perform it:
+
+t3 in f.T1? 
+f.T1 = F() => ANY
+T(t3) = F() => Integer
+
+So let's see, both are function - so ok. both take 0 arguments. So ok. Does f.T1 accepts at least Integer? Yes. So everything's ok.
+
+Now, let's check  t2:
+T(t2) = T(f(t3)) = (F() => R(t3)) = (F() => Integer)
+T(t1) = T(t2()) = R(t2) = Integer
+T(return t1) = T(t1) = Integer
+T(main) = F() => Integer
+
+Wow, it's easier said than done.
+
+*===^===^===^=========-_-oo0oo-_-==========^===^===^===*
+|                                                      |
+<    FOR NOW, CONSIDER ALL THIS STUFF BELOW AS JUNK    >
+|                                                      |
+*===v===v===v==============================v===v===v===*
+
+2. Combine function
+-------------------
+
+Idea behind Combine function is that it takes two types (T1 and T2) and returns single type (R).
+Combine for few functions/operators should be defined in code. I think that currently we need Combine for operators (+, -, *, /, %, &&, ||, maybe something else).
+
+For example Combine for '+' should be:
+
+Combine('+', T1, T2) will work only for certain set of arguments:
+
+T1	T2	R
+-----------------------
+Integer	Integer	Integer
+Integer	Double	Double
+Integer	Float	Float
+Integer	String	String
+
+Double	Integer	Double
+Double	Double	Double
+Double	Float	Double
+Double	String	String
+
+Float	Integer	Float
+Float	Float	Float
+Float	Double	Double
+Float	String	String
+
+String	Integer	String
+String	Double	String
+String	Float	String
+String	String	String
+
+*	*	ERROR
+-----------------------
+
+If mapping can't be performed, ERROR type is returned.
+
+3. Examples
+-----------
+
+a) Simple case
+----------------
+
+def main() {
+	return 1;
+}
+
+main has type: F() => Integer, since '1' has type Integer.
+
+b) Operator case
+----------------
+def main() {
+	return 1 + 3;
+}
+
+main has type: F() => Integer, since '1' has type 'Integer', '3' is also 'Integer', and '+' has type Merge(typeof(1), typeof(2)), which in our case gives 'Integer'.
+
+def main() {
+	a = false;
+	if (a) {
+		return "True";
+	}
+	return false;
+}
+
+First bigger decision: main should be either F() => Object, or this should be compilation error. Of course there are at least two solutions. Either:
+
+def main() {
+	a = false;
+	if (a) {
+		return "True";
+	}
+	return "False";
+}
+
+or:
+
+def main() {
+	a = false;
+	if (a) {
+		return true;
+	}
+	return false;
+}
+
+
+This can be avoided if we will allow type declaration - in this case we give an error saying "Can't deduce return type: String or Boolean. Now, this can be fixed as follows:
+
+def main() : Object {
+	a = false;
+	if (a) {
+		return "True";
+	}
+	return false;
+}
+
+c) Functions
+------------
+
+def fun(a, b) {
+	return a + b;
+}
+
+def main() {
+	return fun(1, 3);
+}
+
+Compiler should work through this example as follows:
+def fun(a, b) -> fun has type F(*, *) => *, so 'a' and 'b' both have type '*'
+return a + b; -> since 'a' and 'b' have type '*', 'a' can take on any combination of the following: Integer, Double, String, Float. This means, that 'a' and 'b' now have type AnyOf(Integer, Double, String, Float). This also means, that '+' has type 'AnyOf(Integer, Double, String, Float)'. So we deduce that 'fun' has type:
+
+  F(T1 = AnyOf(Integer, Double, String, Float), T2 = AnyOf(Integer, Double, String, Float)) => Combine('+', T1, T2)
+
+Ok, so we need another function, Combine. It takes two types and returns another type. Problem: how it will work. It seems that we need tables for each operator - if Integer and Double, return Double, if String and anything return String. So be it.
+
+Now, we get:
+def main() -> so 'main' has type 'F() => *'. Ok, proceed.
+fun(1, 3) -> ah-ha! We know of 'fun', it has type ... Jesus Christ, just look above. '1' is 'Integer', '2' is 'Integer'. Both of these are accepted, so we're fine. Now, let's check return type: Combine('+', T1, T2) where 'T1' and 'T2' are 'Integer, Double, String, Float'. We check '+' type table and see that Integer + Integer = Integer. So be it, 'fun(1, 3)' has type Integer (not F(Integer, Integer) => Integer - we call this function, so we are only interested in returned type).
+
+return fun(1, 3); -> so main returns result is return type of 'fun', so 'Integer'.
+
+So in the end we get:
+
+'fun' has type:
+
+  F(T1 = AnyOf(Integer, Double, String, Float), T2 = AnyOf(Integer, Double, String, Float)) => Combine('+', T1, T2)
+
+'main' has type:
+
+  F() => Integer
+
+d) Functions II
+---------------
+
+Let's change last example a little:
+
+def fun(a, b) {
+	return a + b;
+}
+
+def main() {
+	return fun;
+}
+
+deduction of 'fun' is same as above, but since we're returning 'fun' and not 'fun(1, 3)', type of 'main' becomes:
+
+  F() => F(T1 = AnyOf(Integer, Double, String, Float), T2 = AnyOf(Integer, Double, String, Float)) => Combine('+', T1, T2)
+
+e) Lambdas
+----------
+
+1. def main() {
+2. 	x = \(a) { return a; };
+3. 	return x("a");
+4. }
+
+First, let's change it so that it's easier to see what's going on:
+
+1. def main() {
+2. 	x =
+3.	\(a) {
+4.		return a;
+5. 	};
+6. return x("a");
+
+Line 2: x is undefined, but it will be in a moment. Currently it's type is '*', so T(x) = '*'.
+Line 3: Oh, lambda! But lambdas have their names in reality, and this one is called: main_lam0
+        And we also know that its type right now is: F(*) => *
+Line 4: Ah-ha! Return statement! We will know in a minute what is return type of main_lam0! It's T(a) = '*'. Huh, nothing to worry about:
+
+	T(main_lam0) = F(T1 = *) => T1
+
+So it is a function that takes any type and returns same type.
+
+Line 6: 'return x("a")' - can we call x with String? Yes, we can. This also means that T(x("a")) = T(x(T("a"))) = T(x(String)) = String
+
+'main' has type:
+	T(main) = F() => String
+
+
+f) Lambdas II
+-------------
+
+Now, this is first real challenge. Let's write how this would work in pseudocode.
+
+dd(a, b) {
+        return a + b;
+}
+def mul(a, b) {
+        return a * b;
+}
+def f(a, b) {
+        return \(l, r) { return a(l, r) + b(l, r); }
+}
+
+def main() {
+        return f(add, mul)(1, 2);
+}
+
+See docs/type-check-001.svg to see program tree.
+
+Let's start our work with node 'FUNCTION add'. We try to get type of 'FUNCTION add'. Since it's a function, we assume return type to be ANY (aka '*'). After that, we get argument list type: this will be a list (with 0 or more elements) of Types.
+
+First, look at args: ARG -> VAR: a and ARG -> VAR: b.
+
+These nodes lack type declaration, so set default type: ANY.
+
+So now we have:
+
+T([VAR: a]) -> ANY (aka '*')
+T([VAR: b]) -> ANY
+
+Ok, this is it, right now:
+
+T(add) = F(List[T(a), T(b)]) => ANY
+
+So far so good. Now we walk through statements:
+
+First and only is 'RETURN' with something. Let's check this something:
+
+T([ADD (+)]) = Combine('+', AnyOf(I, D, F, S)
+
+

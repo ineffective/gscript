@@ -1,0 +1,14 @@
+#!/usr/bin/gnuplot
+reset
+set terminal svg size 800, 600 font 'Verdana,8'
+set datafile separator ";"
+
+set xlabel "prog"
+set ylabel "time"
+
+set xtics rotate
+
+set title "times"
+set key below
+set grid
+

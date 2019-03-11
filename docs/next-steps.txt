@@ -1,0 +1,20 @@
+
+Next step:
+----------
+ - perform jumps using labels (label is a node that does not emit any code but defines name and position in code)
+ - maybe allow for assembler
+ - check for "break" outside of loops and switch/case
+ - allow for variable scopes
+
+Short term goals:
+-----------------
+ - add typechecking dammit!
+ - allow for variable arguments count (requires support for arrays (or lists, but i think arrays))
+ - data structure: set
+
+Long term goals:
+----------------
+ - add objects with fields and methods
+   - objects should have private/protected/public fields - or maybe not
+ - partial application
+

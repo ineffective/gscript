@@ -1,0 +1,50 @@
+#!/bin/bash
+
+keepIntermediateFiles=0
+
+if [ -z "$1" ]
+then
+	echo "file name expected"
+	exit
+fi
+
+if [ "$1" = "clean" ]
+then
+	rm -f *.dot *.svg
+	exit
+fi
+
+if [ "$1" = "keep" ]
+then
+	shift
+	keepIntermediateFiles=1
+fi
+
+echo "Processing file $1"
+
+tmpfp=$(cygpath -w /tmp/gssc-temp-out)
+gsr -q +d "${tmpfp}" -f "${1}" 
+
+fn=$(basename "${1}")
+
+if [ ! -f "${tmpfp}".dot ]
+then
+	exit 1
+fi
+
+mv "${tmpfp}".dot "${fn}.dot"
+mv "${tmpfp}".opt.dot "${fn}.opt.dot"
+mv "${tmpfp}".opt.scps.dot "${fn}.opt.scps.dot"
+
+dos2unix "${fn}.dot"     2>/dev/null 1>/dev/null
+dos2unix "${fn}.opt.dot" 2>/dev/null 1>/dev/null
+
+dot -Tsvg -o "${fn}.svg" "${fn}.dot" 2>/dev/null
+dot -Tsvg -o "${fn}.opt.svg" "${fn}.opt.dot" 2>/dev/null
+dot -Tsvg -o "${fn}.opt.scps.svg" "${fn}.opt.scps.dot" 2>/dev/null
+
+if [ "${keepIntermediateFiles}" = "0" ]
+then
+	rm -f "${fn}.dot" "${fn}.opt.dot" "${fn}.opt.scps.dot"
+fi
+

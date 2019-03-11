@@ -1,0 +1,19 @@
+#!/bin/bash
+
+USE_JAR=${USE_JAR:-/home/jd/gs/target/gamescript.jar}
+#echo USING JAR: ${USE_JAR}
+
+if [ -z "${1}" ]
+then
+	echo 'Missing argument: file name.' >&2
+	exit 1
+fi
+
+if [ -z "${2}" ]
+then
+	echo 'Missing argument: output file name.' >&2
+	exit 2
+fi
+
+java -cp $(cygpath -w ${USE_JAR}) com.gs.Script +o +g +a "${2}" -b "${1}"
+

@@ -1,0 +1,401 @@
+%package "com.gs.parser";
+
+%import "com.gs.ast.*";
+%import "com.gs.CMD";
+
+%class "GameScriptParser";
+
+%embed {:
+	private static int autoVarNum = 0;
+	protected Symbol ext(Symbol lhs, Symbol rhs) {
+		return new Symbol((short)0, lhs.getStart(), rhs.getEnd());
+	}
+	protected Symbol extD() {
+		return new Symbol((short)0, 0, 0);
+	}
+	protected String generateAutoVariableName() {
+		return "*GEN*" + autoVarNum++;
+	}
+:};
+
+%terminals INT, FLOAT, IDENT, LPAREN, RPAREN, COMMA, STRING, SEMICOLON, CHARACTER;
+%terminals LBRACE, RBRACE, DOT, BACKSLASH, COLON, PIPE;
+%terminals LSQBRACKET, RSQBRACKET;
+%terminals EQUAL, NOTEQUAL, LESS, GREATER, LESSEQ, GREATEREQ, LOGICALOR, LOGICALAND;
+%terminals ASSIGN, PLUS, MINUS, MUL, DIV, MODULUS;
+%terminals ASSIGN_ADD, ASSIGN_SUB, ASSIGN_MUL, ASSIGN_DIV, ASSIGN_MOD;
+%terminals IF, ELSE, WHILE, DEF, FOR, RETURN;
+%terminals NULL, TRUE, FALSE, SWITCH, CASE, BREAK, DEFAULT;
+%terminals LIST_KW, ARRAY_KW, MAP_KW;
+
+%right DOT;
+%left  RPAREN;
+%right UNARY_MINUS;
+%left  MUL, DIV, MODULUS;
+%left  PLUS, MINUS;
+%left  LESS, GREATER, LESSEQ, GREATEREQ;
+%left  EQUAL, NOTEQUAL;
+%left  LOGICALAND;
+%left  LOGICALOR;
+%right ASSIGN, ASSIGN_ADD, ASSIGN_SUB, ASSIGN_MUL, ASSIGN_DIV, ASSIGN_MOD;
+%left  COMMA;
+%right ELSE, THEN;
+%left  SEMICOLON;
+
+%typeof boolean_comparison, simple_value_field_or_call, assign_expr = "Node";
+%typeof program, expr, statement, var_or_fld, call_args = "Node";
+%typeof function_list, full_func_decl, func_def, formal_call_args = "Node";
+%typeof statement_list, for_post_loop_expr, for_pre_loop_expr = "Node";
+%typeof simple_value, boolean_or_expr, boolean_and_expr = "Node";
+%typeof data_structure_init, list_init, array_init, map_init = "Node";
+%typeof list_init_expr, map_init_expr, map_entry_init_expr = "Node";
+%typeof type_name, formal_arg, value_or_call, code_block, func_body = "Node";
+%typeof var_def, var_decl, var_decl_list, var_decl_name = "Node";
+%typeof mul_expr, addsub_expr, boolean_eqneq_comparison, assign_to = "Node";
+%typeof switch_body, case_list, case_single = "Node";
+%typeof lambda = "LambdaFuncNode";
+%typeof INT = "Integer";
+%typeof IDENT, STRING = "String";
+%typeof FLOAT = "Double";
+%typeof NULL = "Object";
+%typeof FALSE, TRUE = "Boolean";
+%typeof CHARACTER = "Character";
+
+%goal program;
+
+program
+    = function_list.s                   {: return new ProgramNode(ext(_symbol_s, _symbol_s), "", new ListNode(ext(s, s), "", s), null); :}
+    ;
+
+function_list
+    = function_list.l full_func_decl.f  {: return new ListNode(ext(_symbol_l, _symbol_f), "", l, f); :}
+    |                                   {: return new ListNode(extD(), ""); :}
+    ;
+
+full_func_decl
+    = DEF IDENT.name func_def.def       {: return new FuncNode(ext(_symbol_name, _symbol_name), name, def.lhs, def.rhs); :}
+    ;
+
+func_def
+    = LPAREN formal_call_args.fca RPAREN func_body.stlst
+                                        {: return new FuncNode(ext(_symbol_fca, _symbol_stlst), "\\", fca, stlst); :}
+    | LPAREN RPAREN func_body.stlst
+                                        {: return new FuncNode(ext(_symbol_stlst, _symbol_stlst), "\\", null, stlst); :}
+    ;
+
+func_body
+    = code_block.cb                     {: return cb; :}
+    | LPAREN boolean_or_expr.b RPAREN   {: return b; :}
+    ;
+
+statement_list
+    = statement_list.l statement.s      {: return new ListNode(ext(_symbol_l, _symbol_s), "", l, s); :}
+    |                                   {: return new ListNode(extD()); :}
+    ;
+
+statement
+    = IF LPAREN boolean_or_expr.b RPAREN statement.s @THEN
+                                        {: return new IfNode(ext(_symbol_b, _symbol_b), "", b, new IfBlockNode(ext(_symbol_s, _symbol_s), "ifblck", s, null)); :}
+    | IF LPAREN boolean_or_expr.b RPAREN statement.t ELSE statement.f
+                                        {: return new IfNode(ext(_symbol_b, _symbol_b), "", b, new IfBlockNode(ext(_symbol_t, _symbol_t), "ifblck", t, f)); :}
+    | WHILE LPAREN boolean_or_expr.b RPAREN statement.t
+                                        {: return new WhileNode(ext(_symbol_b, _symbol_b), "while", b, t); :}
+    | FOR LPAREN for_pre_loop_expr.e SEMICOLON boolean_or_expr.b SEMICOLON for_post_loop_expr.a RPAREN statement.s
+                                        {: return new ListNode(ext(_symbol_e, _symbol_s), "for-loop",
+                                                          new StatementEndNode(ext(_symbol_e, _symbol_e), "", e),
+                                                          new WhileNode(ext(_symbol_b, _symbol_b), "while", b,
+                                                              new ListNode(ext(_symbol_s, _symbol_s), "", s,
+                                                                  new StatementEndNode(ext(_symbol_a, _symbol_a) , "", a)
+                                                              )
+                                                          )
+                                           );
+                                        :}
+    | FOR LPAREN var_decl_name.v PIPE simple_value_field_or_call.o RPAREN statement.s
+                                        {: Symbol sv = ext(_symbol_v, _symbol_o);
+                                           String autoVarName = generateAutoVariableName();
+                                           Node iter = new StatementEndNode(sv, "",
+                                               new BinNode(sv, CMD.SET, "=",
+                                                   new VarDeclNode(sv, autoVarName),
+                                                   new CallNode(sv, "()",
+                                                       new BinNode(sv, CMD.DOT, ".",
+                                                           new MkIterNode(sv, o),
+                                                           new PushConstNode(sv, "iterator")))));
+                                           Node varinit = new StatementEndNode(sv, "",
+                                               new BinNode(sv, CMD.SET, "=",
+                                                   v,
+                                                   new PushConstNode(sv, "null")));
+                                           Node hasnext = new CallNode(sv, "()",
+                                               new BinNode(sv, CMD.DOT, ".",
+                                                   new VarNode(sv, autoVarName),
+                                                   new PushConstNode(sv, "hasNext")));
+                                           Node vargennext = new StatementEndNode(sv, "",
+                                               new BinNode(sv, CMD.SET, "=",
+                                                   new VarNode(sv, v.name),
+                                                   new CallNode(sv, "()",
+                                                       new BinNode(sv, CMD.DOT, ".",
+                                                           new VarNode(sv, autoVarName),
+                                                           new PushConstNode(sv, "next")))));
+                                           return new ListNode(sv, "",
+                                               new ListNode(sv, "",
+                                                   new ListNode(sv, "",
+                                                       iter
+                                                   ),
+                                                   varinit
+                                               ),
+                                               new WhileNode(sv, "while",
+                                                   hasnext,
+                                                   new ListNode(sv, "",
+                                                       new ListNode(sv, "",
+                                                           vargennext
+                                                       ),
+                                                       s)));
+                                        :}
+    | SWITCH LPAREN boolean_or_expr.v RPAREN switch_body.b
+                                        {: return new SwitchNode(ext(_symbol_v, _symbol_b), "", v, b); :}
+    | code_block.s                      {: return s; :}
+    | assign_expr.e SEMICOLON           {: return new StatementEndNode(ext(_symbol_e, _symbol_e), "", e); :}
+    | simple_value_field_or_call.v SEMICOLON
+                                        {: return new StatementEndNode(ext(_symbol_v, _symbol_v), "", v); :}
+    // don't know if this is clever, but it does not have "StatementEndNode" before it, which means
+    // that it won't POP from the stack, so value will be left as is on the stack, ready to be returned.
+    | RETURN boolean_or_expr.e SEMICOLON
+                                        {: return new ReturnNode(ext(_symbol_e, _symbol_e), "", e, null); :}
+    | var_def.v SEMICOLON               {: return new StatementEndNode(ext(_symbol_v, _symbol_v), "", v); :}
+    | BREAK.b SEMICOLON                 {: return new ListNode(ext(b, b), "", null, null); :}
+    | SEMICOLON.s                       {: return new ListNode(ext(s, s), "", null, null); :}
+    ;
+
+switch_body
+    = LBRACE case_list.l RBRACE         {: return l; :}
+    ;
+
+case_list
+    = case_list.l case_single.c         {: return new ListNode(ext(_symbol_l, _symbol_c), "", l, c); :}
+    | case_single.c                     {: return c; :}
+    ;
+
+case_single
+    = CASE.c simple_value.v COLON statement.s
+                                        {: return new CaseNode(ext(c, _symbol_s), "", v, s); :}
+    | DEFAULT.d COLON statement.s       {: return new DefaultNode(ext(d, _symbol_s), "", s); :}
+    ;
+
+code_block
+    = LBRACE statement_list.s RBRACE    {: return s; :}
+    ;
+
+for_pre_loop_expr
+    = var_def.vd                        {: return vd; :}
+    | assign_expr.ae                    {: return ae; :}
+    ;
+
+for_post_loop_expr
+    = assign_expr.e                     {: return e; :}
+    | simple_value_field_or_call.v      {: return v; :}
+    ;
+
+boolean_or_expr
+    = boolean_and_expr.e                {: return e; :}
+    | boolean_or_expr.l LOGICALOR boolean_and_expr.r
+                                        {: return new BinNode(ext(_symbol_l, _symbol_r), CMD.OR, "||", l, r); :}
+    ;
+
+boolean_and_expr
+    = boolean_eqneq_comparison.e              {: return e; :}
+    | boolean_and_expr.l LOGICALAND boolean_eqneq_comparison.r
+                                        {: return new BinNode(ext(_symbol_l, _symbol_r), CMD.AND, "&&", l, r); :}
+    ;
+
+boolean_eqneq_comparison
+    = boolean_comparison.bc             {: return bc; :}
+    | boolean_eqneq_comparison.a EQUAL boolean_comparison.b
+                                        {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.EQ, "==", a, b); :}
+    | boolean_eqneq_comparison.a NOTEQUAL boolean_comparison.b
+                                        {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.NOTEQ, "!=", a, b); :}
+    ;
+
+boolean_comparison
+    = boolean_comparison.a LESS mul_expr.b                {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.LT, "<", a, b); :}
+    | boolean_comparison.a GREATER mul_expr.b             {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.GT, ">", a, b); :}
+    | boolean_comparison.a LESSEQ mul_expr.b              {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.LTEQ, "<=", a, b); :}
+    | boolean_comparison.a GREATEREQ mul_expr.b           {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.GTEQ, ">=", a, b); :}
+    | mul_expr.a                            {: return a; :}
+    ;
+
+mul_expr
+    = mul_expr.a MUL  addsub_expr.b                {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.MUL, "*", a, b); :}
+    | mul_expr.a DIV   addsub_expr.b               {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.DIV, "/", a, b); :}
+    | mul_expr.a MODULUS addsub_expr.b             {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.MODULUS, "%", a, b); :}
+    | addsub_expr.a                       {: return a; :}
+    ;
+
+addsub_expr
+    = addsub_expr.a PLUS  expr.b               {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.ADD, "+", a, b); :}
+    | addsub_expr.a MINUS expr.b               {: return new BinNode(ext(_symbol_a, _symbol_b), CMD.SUB, "-", a, b); :}
+    | expr.e                            {: return e; :}
+    ;
+
+expr
+    = MINUS expr.e @ UNARY_MINUS        {: return new NegateNode(ext(_symbol_e, _symbol_e), "u-", e, null);    :}
+    | LPAREN boolean_or_expr.e RPAREN   {: return e; :}
+    | simple_value_field_or_call.v      {: return v; :}
+    | LPAREN assign_expr.a RPAREN       {: return a; :}
+    ;
+
+assign_expr
+    = assign_to.p ASSIGN boolean_or_expr.e
+                                        {: return new BinNode(ext(_symbol_p, _symbol_e), CMD.SET, "=", p, e); :}
+    | assign_to.p ASSIGN_ADD boolean_or_expr.e
+                                        {: return new BinNode(ext(_symbol_p, _symbol_e), CMD.SET, "=", p,
+                                                              new BinNode(ext(_symbol_p, _symbol_e), CMD.ADD, "+", p, e)); :}
+    | assign_to.p ASSIGN_SUB boolean_or_expr.e
+                                        {: return new BinNode(ext(_symbol_p, _symbol_e), CMD.SET, "=", p,
+                                                              new BinNode(ext(_symbol_p, _symbol_e), CMD.SUB, "-", p, e)); :}
+    | assign_to.p ASSIGN_MUL boolean_or_expr.e
+                                        {: return new BinNode(ext(_symbol_p, _symbol_e), CMD.SET, "=", p,
+                                                              new BinNode(ext(_symbol_p, _symbol_e), CMD.MUL, "*", p, e)); :}
+    | assign_to.p ASSIGN_DIV boolean_or_expr.e
+                                        {: return new BinNode(ext(_symbol_p, _symbol_e), CMD.SET, "=", p,
+                                                              new BinNode(ext(_symbol_p, _symbol_e), CMD.DIV, "/", p, e)); :}
+    | assign_to.p ASSIGN_MOD boolean_or_expr.e
+                                        {: return new BinNode(ext(_symbol_p, _symbol_e), CMD.SET, "=", p,
+                                                              new BinNode(ext(_symbol_p, _symbol_e), CMD.MODULUS, "%", p, e)); :}
+    ;
+
+assign_to
+    = assign_expr.a                     {: return a; :}
+    | value_or_call.p                         {: return p; :}
+    ;
+
+var_def
+    = var_decl_list.v               {: return v; :}
+    ;
+
+var_decl_list
+    = var_decl_list.vdl COMMA var_decl.vd
+                                        {: return new ListNode(ext(_symbol_vdl, _symbol_vd), "", vdl, vd); :}
+    | var_decl.vd                       {: return vd; :}
+    ;
+
+var_decl
+    = var_decl_name.n ASSIGN boolean_and_expr.e
+                                        {: return new BinNode(ext(_symbol_n, _symbol_e), CMD.SET, "=", n, e); :}
+    ;
+
+var_decl_name
+    = DEF IDENT.n                           {: return new VarDeclNode(ext(_symbol_n, _symbol_n), n); :}
+    | DEF IDENT.n COLON type_name.t         {: return new VarDeclNode(ext(_symbol_n, _symbol_n), n, t); :}
+    ;
+
+
+array_init
+    = ARRAY_KW LSQBRACKET list_init_expr.e RSQBRACKET
+                                        {: return new InitArrayNode(ext(_symbol_e, _symbol_e), "", null, e); :}
+    | ARRAY_KW.a LSQBRACKET RSQBRACKET.c
+                                        {: return new InitArrayNode(ext(a, c), "", null, new ListNode(ext(a, c))); :}
+    | ARRAY_KW LPAREN boolean_or_expr.e RPAREN
+                                        {: return new InitArrayNode(ext(_symbol_e, _symbol_e), "", e, null); :}
+    ;
+
+map_init
+    = MAP_KW.l LSQBRACKET RSQBRACKET.r  {: return new InitMapNode(ext(l, r), "", null, null); :}
+    | MAP_KW.l LSQBRACKET map_init_expr.e RSQBRACKET.r
+                                        {: return new InitMapNode(ext(l, r), "", null, e); :}
+    ;
+
+list_init
+      // first, empty list
+    = LIST_KW.l LSQBRACKET RSQBRACKET.r {: return new InitListNode(ext(l, r), "", null, null); :}
+      // and now, list of expressions
+    | LIST_KW.l LSQBRACKET list_init_expr.e RSQBRACKET.r
+                                        {: return new InitListNode(ext(l, r), "", null, e); :}
+    ;
+
+map_entry_init_expr
+    = LSQBRACKET boolean_or_expr.k COMMA boolean_or_expr.v RSQBRACKET
+                                        {: return new MapEntryNode(ext(_symbol_k, _symbol_v), "", k, v); :}
+    ;
+
+map_init_expr
+    = map_entry_init_expr.e             {: return new ListNode(ext(_symbol_e, _symbol_e), "", e); :}
+    | map_init_expr.li COMMA map_entry_init_expr.e
+                                        {: return new ListNode(ext(_symbol_li, _symbol_e), "", e, li); :}
+    ;
+
+list_init_expr
+      // first, single expression
+    = boolean_and_expr.e                {: return new ListNode(ext(_symbol_e, _symbol_e), "", e); :}
+      // and now, multiple expressions
+    | list_init_expr.li COMMA boolean_and_expr.e
+                                        {: return new ListNode(ext(_symbol_li, _symbol_e), "", e, li); :}
+    ;
+
+data_structure_init
+    = list_init.li                      {: return li; :}
+    | map_init.li                       {: return li; :}
+    | array_init.li                     {: return li; :}
+    ;
+
+var_or_fld
+      // either simple variable reference (x)
+    = IDENT.i                           {: return new VarNode(ext(_symbol_i, _symbol_i), i); :} // no dots yet
+      // or chain of calls and field references (x.y().z.v())
+    | data_structure_init.li            {: return li; :}
+    | lambda.lam                        {: return lam; :}
+    ;
+
+value_or_call
+    = var_or_fld.p                      {: return p; :}
+    | value_or_call.p LPAREN call_args.arglst RPAREN
+                                        {: return new CallNode(ext(_symbol_p, _symbol_arglst), "()", p, arglst); :}
+    | value_or_call.p LPAREN RPAREN     {: return new CallNode(ext(_symbol_p, _symbol_p), "()", p, null); :}
+    | value_or_call.f DOT IDENT.i       {: return new BinNode(ext(_symbol_f, _symbol_i), CMD.DOT, ".", f, new PushConstNode(ext(_symbol_i, _symbol_i), i)); :} // dots seen, so just push and add DOT instruction
+    | value_or_call.p LSQBRACKET.l boolean_or_expr.e RSQBRACKET.r
+                                        {: return new BinNode(ext(l, r), CMD.SUBSCRIPT, "[]", p, e); :} 
+    ;
+
+lambda
+    = BACKSLASH func_def.f              {: return new LambdaFuncNode(ext(_symbol_f, _symbol_f), "\\", f.lhs, f.rhs); :} // lambda creation
+    ;
+
+simple_value_field_or_call
+    = simple_value.v                    {: return v; :}
+    | value_or_call.p                   {: return p; :}
+    ;
+
+simple_value
+    = INT.n                             {: return new PushConstNode(ext(_symbol_n, _symbol_n), n);    :}
+    | FLOAT.n                           {: return new PushConstNode(ext(_symbol_n, _symbol_n), n);    :}
+    | STRING.n                          {: return new PushConstNode(ext(_symbol_n, _symbol_n), n);    :}
+    | TRUE.n                            {: return new PushConstNode(ext(_symbol_n, _symbol_n), n);    :}
+    | FALSE.n                           {: return new PushConstNode(ext(_symbol_n, _symbol_n), n);    :}
+    | NULL.n                            {: return new PushConstNode(ext(_symbol_n, _symbol_n), n);    :}
+    | CHARACTER.n                       {: return new PushConstNode(ext(_symbol_n, _symbol_n), n);    :}
+    ;
+
+formal_call_args
+    = formal_arg.fa                     {: return new ArgNode(ext(_symbol_fa, _symbol_fa), ", ", fa, null); :}
+    | formal_arg.fa COMMA formal_call_args.a
+                                        {: return new ArgNode(ext(_symbol_fa, _symbol_a), ", ", fa, a); :}
+    ;
+
+formal_arg
+    = IDENT.n                           {: return new VarDeclNode(ext(_symbol_n, _symbol_n), n); :}
+    | IDENT.n COLON type_name.t         {: return new VarDeclNode(ext(_symbol_n, _symbol_n), n, t); :}
+    ;
+
+type_name
+    = IDENT.n                           {: return new TypeNameNode(ext(_symbol_n, _symbol_n), n); :}
+    | type_name.lhs DOT IDENT.rhs       {: return new TypeNameNode(ext(_symbol_lhs, _symbol_rhs), lhs.name + "." + rhs); :}
+    ;
+
+// call_args = expr.e returns new ArgNode instead of e to avoid special cases during
+// code emission. Initially "return e;" was used, but this meant that if there
+// were two or more args, last ArgNode has lhs = <Code> and rhs = <Code>, instead
+// of lhs = <Code> and rhs = ArgNode. So additional node is created and all ArgNodes
+// look exactly the same. Joy.
+call_args
+    = boolean_or_expr.e                            {: return new ArgNode(ext(_symbol_e, _symbol_e), ", ", e, null); :} 
+    | boolean_or_expr.e COMMA call_args.a          {: return new ArgNode(ext(_symbol_e, _symbol_a), ", ", e, a); :}
+    ;
+

@@ -1,0 +1,176 @@
+#!/bin/bash
+
+export PATH=$PATH:~/gs/bin/
+
+iterCount=${iterCount:-100000}
+noBuild=${noBuild:-0}
+
+export iterCount
+USE_JAR=${USE_JAR:-/home/jd/gs/target/gamescript.jar}
+
+export USE_JAR
+progs=progs/basic/*.gs
+
+function getTests() {
+	{
+		for x in progs/basic/*.gs ; do echo $x ; done
+	}
+}
+
+genCSV() {
+
+dos2unix profout.txt 2>/dev/null 1>/dev/null
+
+gawk 'BEGIN{
+	print "test;calls;timepercall;instr;instrpersec;totaltime"
+}
+function printTest() {
+	printf ("%s;%s;%s;%s;%s;%s\n", t["test"], t["calls"], t["timepercall"], t["instr"], t["instrpersec"], t["totaltime"]);
+	delete t;
+}
+/EXECUTING TEST:/{ printTest(); t["test"] = $3; next;}
+/^calls/ { t["calls"] = $3; next; }
+/^time\/call/ { t["timepercall"] = $3; next; }
+/^instructs/ { t["instr"] = $3; next; }
+/^instr\/sec/ { t["instrpersec"] = $3; next; }
+/^tot usec/ { t["totaltime"] = $4; next; }
+END { printTest(); }
+' profout.txt > profresult.csv
+
+
+grep -E '^(END|SET|PUSH|POP|DOT|GETVAR|CALL|ADD|SUB|MUL|NEG|DIV|MODULUS|AND|OR|EQ|LT|GT|LTEQ|GTEQ|NOTEQ|JMP|JMPFALSE|LAMBDA|BIND|MKLIST|PUSHCONST|GETGLOB|GETFUNC|SUBSCRIPT|MKARRAY|LISTTOARRAY|MKMAP|MKMAPENTRY|LISTTOMAP).*[0-9]+$' profout.txt | gawk '{s[$1] += $2;} END{for(x in s) { print x";"s[x] }}'  > profcmds.csv
+}
+
+runProfile() {
+	if [ "$noBuild" = 0 ]
+	then
+		if bash go.sh | grep -qF '[INFO] BUILD FAILURE' # rebuild and check for errors
+		then
+			echo "COMPILATION ERROR"
+			return
+		fi
+	fi
+	(
+		mkdir -p "./$runDir"
+		cd "./$runDir"
+		echo executing tests: $tests
+
+		rm -f profout.txt errlog
+
+		for x in $tests
+		do
+			{
+			echo ----------------------- | tee -a errlog
+			echo EXECUTING TEST: $x | tee -a errlog
+			echo ----------------------- | tee -a errlog
+			gsr -q -t true -c ${iterCount} -f "../${x}" -s dump 2>>errlog
+			} | tee -a profout.txt
+		done
+		genCSV
+
+		( cat ../gnuplot.setup ; cat << EOF
+plot "profresult.csv" using (column(0)):4 title "PRE"
+EOF
+) | gnuplot.exe > "result.png"		
+
+	)
+}
+
+makehtml() {
+	echo MAKINGHTML FOR $1 AND $2
+	(
+	name=dual-$1-$2
+	dir=${name}-result
+	mkdir -p "$dir"
+	mv *.svg $dir
+	echo '<html><head></head><body>'
+	echo '<img src="./'$dir/$name'-ips.svg"><br/>'
+	echo '<img src="./'$dir/$name'-tt.svg"><br/>'
+	echo '<img src="./'$dir/$name'-diff.svg"><br/>'
+	echo '<table>'
+	gawk '{print"<tr><td>"$1"</td><td><a href=\"progs/basic/"$3".gs\">"$3"</a></td><tr/>"}' faster.txt
+	echo '</table>'
+	echo '</body>'
+	) > result-$1-$2.html
+}
+
+if [ "$1" = "clean" ]
+then
+	rm -f profout.txt profresult.csv profcmds.csv dual-*.png hprof.txt *.svg tempor.txt gnuplot.exe.stackdump result.html
+	for x in dual-*
+	do
+		[ -d "$x" ] && rm -rf "$x"
+	done
+	exit
+fi
+if [ "$1" = "compare" ]
+then
+	first=${2:?Second parameter should name first test to compare}
+	second=${3:?Third parameter should name first test to compare}
+	paste -d';' "$first/profresult.csv" "$second/profresult.csv" | tail -n +2 | grep -v ";;;" | sed 's!^progs/basic/\([^.]\+\)\.gs!\1!' > tempor.txt 
+	( cat gnuplot.setup ; cat << EOF
+plot "tempor.txt" using (column(0)):11 with lines title "$second INSTRUCTIONS PER SECOND", "" using (column(0)):5 with lines title "$first INSTRUCTIONS PER SECOND"
+EOF
+) | gnuplot.exe  > "dual-${2}-${3}-ips.svg"
+	( cat gnuplot.setup ; cat << EOF
+plot "tempor.txt" using (column(0)):12 with lines title "$second TOTAL TIME", "" using (column(0)):6 with lines title "$first TOTAL TIME"
+EOF
+) | gnuplot.exe  > "dual-${2}-${3}-tt.svg"
+	( cat gnuplot.setup ; cat << EOF
+plot "tempor.txt" using (column(0)):(\$11-\$5):xticlabels(1) with lines title "DIFFERENCE BETWEEN $second and $first (time)"
+EOF
+) | gnuplot.exe > "dual-${2}-${3}-diff.svg" 
+	gawk -F\; '$5>$11{print ($5/$11)*100" % "$1}' tempor.txt | sort -nr > faster.txt
+	makehtml "$2" "$3"
+	rm -f tempor.txt faster.txt
+	exit
+fi
+
+if [ "$1" = "run" ]
+then
+	echo "in RUN"
+	shift
+	runDir=${1:?First parameter must name test}
+
+	tests=$(getTests)
+
+	shift
+	if [ $# -gt 0 ]
+	then
+		tests=$@
+	fi
+
+	runProfile
+
+	exit
+fi
+
+if [ "$1" = "hprof" ]
+then
+	shift
+	prgs=$(find progs/basic/ -type f -name '*.gs' -a \! -name 'test0011.gs' \! -name 'test0030.gs' \! -name 'test0031.gs' \! -name 'test0037.gs' \! -name 'test0038.gs' \! -name 'test0053.gs' \! -name 'test9999.gs' | while read x ; do printf " -f %s " "$x" ; done)
+	echo Args left: $#
+	if [ "$#" -gt 0 ]
+	then
+		prgs=
+		while [ "$#" -gt 0 ]
+		do
+			prgs="$prgs $(printf " -f %s" "$1")"
+			shift
+		done
+	fi
+	echo $prgs
+	useProfiler=1 bin/gsr -q -t true -c $iterCount $prgs -s dump
+	exit
+fi
+
+cat << EOF
+Usage: $0 cmd
+
+Where cmd can be:
+	run - run tests
+	hprof - run tests under profiler
+	clean - remove all results and temporary files
+	compare - compare results of two tests
+EOF
+
