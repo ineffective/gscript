@@ -1,11 +1,16 @@
 #!/bin/bash
-
 PROF_OPTS=
-USE_JAR=${USE_JAR:-/home/jd/gs/target/gamescript.jar}
+
+bindir=$(dirname $(readlink -f $0))
+USE_JAR=${USE_JAR:-"${bindir}/../target/gamescript.jar"}
+if [ "$OSTYPE" = "cygwin" ] ; then
+	USE_JAR=$(cygpath -w "${USE_JAR}")
+fi
+
 if [ "$useProfiler" = 1 ]
 then
 	PROF_OPTS=-agentlib:hprof=file=hprof.txt,cpu=samples,depth=5
 fi
 
-java $PROF_OPTS -cp $(cygpath -w ${USE_JAR}) com.gs.Script "${@}"
+java $PROF_OPTS -cp ${USE_JAR} com.gs.Script "${@}"
 

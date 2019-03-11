@@ -1,0 +1,70 @@
+#!/bin/bash
+
+pathTransform() {
+	[ "$OSTYPE" = "cygwin" ] && echo $(cygpath -w "$1") && return
+	echo "$1"
+}
+reqNotEmpty() {
+	while [ -n "$1" ]; do
+		var=$1
+		shift
+		switch=$1
+		value=$(eval echo "\$$var")
+		if [ -z "$value" ]; then
+			echo Value $var not defined, use $switch
+			exit 1
+		fi
+		shift
+	done
+}
+
+keepIntermediateFiles=0
+
+while [ -n "$1" ]; do
+	case "$1" in
+	--keep|-k) shift ; keepIntermediateFiles=1 ;;
+	--file|-f) shift ; fileName="$1" ;;
+	--type|-t) shift ; fileType="$1" ;;
+	esac
+	shift
+done
+reqNotEmpty fileName --file fileType --type
+
+case "$fileType" in
+	svg|png) : ;;
+	*) echo Output format neither SVG nor PNG. && exit 1 ;;
+esac
+
+otype=$fileType
+
+[ ! -f "$fileName" ] && echo File $fileName does not exit && exit 1
+
+echo "Processing file $fileName"
+
+tmpfp=$(pathTransform /tmp/gssc-temp-out)
+
+gsr -q +d "${tmpfp}" -f "${fileName}" 
+
+fn=$(basename "${fileName}")
+
+if [ ! -f "${tmpfp}".dot ]
+then
+	exit 1
+fi
+
+mv "${tmpfp}".dot "${fn}.dot"
+mv "${tmpfp}".opt.dot "${fn}.opt.dot"
+mv "${tmpfp}".opt.scps.dot "${fn}.opt.scps.dot"
+
+dos2unix "${fn}.dot"     2>/dev/null 1>/dev/null
+dos2unix "${fn}.opt.dot" 2>/dev/null 1>/dev/null
+
+dot -T"${otype}" -o "${fn}.${otype}" "${fn}.dot" 2>/dev/null
+dot -T"${otype}" -o "${fn}.opt.${otype}" "${fn}.opt.dot" 2>/dev/null
+dot -T"${otype}" -o "${fn}.opt.scps.${otype}" "${fn}.opt.scps.dot" 2>/dev/null
+
+if [ "${keepIntermediateFiles}" = "0" ]
+then
+	rm -f "${fn}.dot" "${fn}.opt.dot" "${fn}.opt.scps.dot"
+fi
+

@@ -1,7 +1,10 @@
 #!/bin/bash
 
-USE_JAR=${USE_JAR:-/home/jd/gs/target/gamescript.jar}
-#echo USING JAR: ${USE_JAR}
+bindir=$(dirname $(readlink -f $0))
+USE_JAR=${USE_JAR:-"${bindir}/../target/gamescript.jar"}
+if [ "$OSTYPE" = "cygwin" ] ; then
+	USE_JAR=$(cygpath -w "${USE_JAR}")
+fi
 
 if [ -z "${1}" ]
 then

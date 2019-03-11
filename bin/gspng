@@ -1,34 +1,6 @@
 #!/bin/bash
 
-if [ -z "$1" ]
-then
-	echo "file name expected"
-	exit
-fi
+[ -z "$1" ] || [ ! -f "$1" ] && echo File name $1 is invalid. && exit 1
 
-if [ "$1" = "clean" ]
-then
-	rm -f *.dot *.png
-	exit
-fi
-
-echo "Processing file $1"
-
-tmpfp=$(cygpath -w /tmp/gssc-temp-out)
-gsr -q +d "${tmpfp}" -f "${1}" 
-
-fn=$(basename "${1}")
-
-mv "${tmpfp}".dot "${fn}.dot"
-mv "${tmpfp}".opt.dot "${fn}.opt.dot"
-mv "${tmpfp}".opt.scps.dot "${fn}.opt.scps.dot"
-
-dos2unix "${fn}.dot"     2>/dev/null 1>/dev/null
-dos2unix "${fn}.opt.dot" 2>/dev/null 1>/dev/null
-
-dot -Tpng -o "${fn}.png" "${fn}.dot" 2>/dev/null
-dot -Tpng -o "${fn}.opt.png" "${fn}.opt.dot" 2>/dev/null
-dot -Tpng -o "${fn}.opt.scps.png" "${fn}.opt.scps.dot" 2>/dev/null
-
-rm -f "${fn}.dot" "${fn}.opt.dot" "${fn}.opt.scps.dot"
+gsdot --type png --file "$1"
 
