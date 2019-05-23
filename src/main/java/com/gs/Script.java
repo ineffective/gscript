@@ -1,6 +1,8 @@
 package com.gs;
 
+import java.lang.reflect.Constructor;
 import java.util.HashMap;
+
 import com.gs.GSVM.GSVMJustUnwindStackException;
 
 public class Script {
@@ -56,6 +58,9 @@ public class Script {
 			rt.put("io", new io());
 		}
 		rt.put("gs", new gs(r));
+		Constructor<Math> x = Math.class.getDeclaredConstructor();
+		x.setAccessible(true);
+		rt.put("math", x.newInstance());
 		rt.put("TestEnum", TestEnum.class);
 		stuff s = new stuff();
 		s.hmap.put(TestEnum.VAL_A, new HashMap<String, Object>());
