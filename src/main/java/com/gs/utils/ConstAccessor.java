@@ -24,15 +24,15 @@ public final class ConstAccessor implements IAccessor {
 	public void release() {
 		pool.push(this);
 	}
-	public Object get() throws Exception {
+	public Object get() throws Throwable {
 		return value;
 	}
-	public void set(Object o) throws Exception {
+	public void set(Object o) {
 		throw new RuntimeException("Can't assign to constant.");
 	}
 	// Ok, if invoke was called, it was most probably immediate application of lambda or call
 	// of function returned from some other function.
-	public Object invoke(Object[] args) throws Exception {
+	public Object invoke(Object[] args) throws Throwable {
 		CallableObject co = (CallableObject)value;
 		return co.call(vm, args);
 	}

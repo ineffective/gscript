@@ -24,13 +24,13 @@ public final class VarAccessor implements IAccessor {
 	public void release() {
 		pool.push(this);
 	}
-	public Object get() throws Exception {
+	public Object get() throws Throwable {
 		return vm.getVar(name);
 	}
-	public void set(Object o) throws Exception {
+	public void set(Object o) throws Throwable {
 		vm.putVar(name, o);
 	}
-	public Object invoke(Object[] args) throws Exception {
+	public Object invoke(Object[] args) throws Throwable {
 		CallableObject co = (CallableObject)vm.getVar(name);
 		return co.call(vm, args);
 	}

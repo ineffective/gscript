@@ -47,7 +47,7 @@ public class Script {
 		VAL_A, VAL_B, VAL_C;
 	}
 	private static boolean permanentRuntime = false;
-	private static Runtime getRuntime() throws Exception {
+	private static Runtime getRuntime() throws Throwable {
 		if (permanentRuntime == true && r != null) {
 			return r;
 		}
@@ -58,9 +58,9 @@ public class Script {
 			rt.put("io", new io());
 		}
 		rt.put("gs", new gs(r));
-		Constructor<Math> x = Math.class.getDeclaredConstructor();
-		x.setAccessible(true);
-		rt.put("math", x.newInstance());
+//		Constructor<Math> x = Math.class.getDeclaredConstructor();
+//		x.setAccessible(true);
+//		rt.put("math", x.newInstance());
 		rt.put("TestEnum", TestEnum.class);
 		stuff s = new stuff();
 		s.hmap.put(TestEnum.VAL_A, new HashMap<String, Object>());
@@ -158,7 +158,7 @@ public class Script {
 			"file with instruction dump for prog2.gs\n\n"
 		);
 	}
-	public static void main(String[] args) throws Exception {
+	public static void main(String[] args) throws Throwable {
 		int i = 0;
 		Runtime.CompilationOpts opts = new Runtime.CompilationOpts();
 		try {

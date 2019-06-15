@@ -5,7 +5,7 @@ import java.io.PrintWriter;
 import com.gs.GSException;
 
 public class CallableObject {
-	String name;
+	protected String name;
 	int slotsCount;
 	int argsCount;
 	protected Object[] exec;
@@ -38,7 +38,7 @@ public class CallableObject {
 	}
 	// this puts args on the stack and calls using provided VM
 	// if called from vm, no arguments should be provided
-	public Object call(GSVM vm, Object... args) throws Exception {
+	public Object call(GSVM vm, Object... args) throws Throwable {
 		if (argsCount != args.length) {
 			throw new GSException("Function " + name
 				+ " called with invalid number of arguments: required: "
@@ -47,4 +47,3 @@ public class CallableObject {
 		return vm.run(this, new Object[this.slotsCount], args);
 	}
 }
-
