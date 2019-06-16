@@ -3,7 +3,7 @@ package com.gs.utils;
 import java.util.ArrayDeque;
 
 public abstract class VMCombinator {
-	public static final VMPair fetch(ArrayDeque<Object> s) throws Exception {
+	public static final VMPair fetch(ArrayDeque<Object> s) throws Throwable {
 		IAccessor acc1 = null;
 		IAccessor acc2 = null;
 		Object r = (acc1 = ((IAccessor)s.pop())).get();
@@ -12,7 +12,7 @@ public abstract class VMCombinator {
 		acc2.release();
 		return new VMPair(l, r);
 	}
-	public Object Combine(ArrayDeque<Object> s) throws Exception {
+	public Object Combine(ArrayDeque<Object> s) throws Throwable {
 		VMPair p = fetch(s);
 		if (p.l instanceof String || p.r instanceof String) {
 			return Combine(p.l.toString(), p.r.toString());
@@ -29,7 +29,7 @@ public abstract class VMCombinator {
 	public abstract Long Combine(Long l, Long r);
 	public abstract Double Combine(Double l, Double r);
 
-	public String Combine(String l, String r) throws Exception {
+	public String Combine(String l, String r) throws Throwable {
 		throw new RuntimeException("Combinator not defined for strings");
 	}
 	public static final VMCombinator ADD = new VMCombinator() {

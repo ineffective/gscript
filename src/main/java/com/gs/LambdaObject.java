@@ -19,7 +19,7 @@ public class LambdaObject extends CallableObject {
 	// this puts args on the stack and calls using provided VM
 	// if called from vm, no arguments should be provided
 	@Override
-	public Object call(GSVM vm, Object... args) throws Exception {
+	public Object call(GSVM vm, Object... args) throws Throwable {
 		if (argsCount != args.length) {
 			throw new GSException("Function " + name
 				+ " called with invalid number of arguments: required: "

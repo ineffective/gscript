@@ -54,7 +54,7 @@ public final class GSVM {
 		prog = prog_stack.size() == 0 ? null : prog_stack.peek();
 	}
 
-	public void putGlobal(String name, Object var) throws Exception {
+	public void putGlobal(String name, Object var) throws Throwable {
 		globs.put(name, var);
 	}
 
@@ -69,7 +69,7 @@ public final class GSVM {
 		return globs.get(name);
 	}
 
-	public void putVar(int slot, Object var) throws Exception {
+	public void putVar(int slot, Object var) throws Throwable {
 		vars.peek()[slot] = var;
 	}
 
@@ -100,7 +100,7 @@ public final class GSVM {
 		methodFinder = new MethodFinder(mfp);
 	}
 
-	public Object run(CallableObject function, Object[] variables, Object... args) throws Exception {
+	public Object run(CallableObject function, Object[] variables, Object... args) throws Throwable {
 		pushCode(function.getCode());
 		pushVariablesVector(variables);
 		System.arraycopy(args, 0, variables, 0, args.length);

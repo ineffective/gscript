@@ -77,7 +77,7 @@ public final class CompoundAccessor implements IAccessor {
 		return "CMPA: " + object + ": " + designator;
 	}
 	@SuppressWarnings("unchecked")
-	public Object get() throws Exception {
+	public Object get() throws Throwable {
 		Class<?> fromCls = object.get().getClass();
 		if (fromCls.isArray()) {
 			return ArrayUtil.get(object.get(), ((Number)designator).intValue());
@@ -93,7 +93,7 @@ public final class CompoundAccessor implements IAccessor {
 		throw new RuntimeException("object " + object.get() + " [" + fromCls + "] is not an array or list");
 	}
 	@SuppressWarnings("unchecked")
-	public void set(Object o) throws Exception {
+	public void set(Object o) throws Throwable {
 		Class<?> fromCls = object.get().getClass();
 		if (fromCls.isArray()) {
 			ArrayUtil.set(object.get(), ((Number)designator).intValue(), o);
@@ -113,7 +113,7 @@ public final class CompoundAccessor implements IAccessor {
 		}
 		throw new RuntimeException("object " + object.get() + " [" + fromCls + "] is not an array, linkedlist nor abstractmap instance");
 	}
-	public Object invoke(Object[] args) throws Exception {
+	public Object invoke(Object[] args) throws Throwable {
 		CallableObject co = (CallableObject)get();
 		return co.call(vm, args);
 	}

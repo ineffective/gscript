@@ -199,7 +199,7 @@ public class Runtime {
 	public CallableObject getFunction(String s) {
 		return callables.get(s);
 	}
-	public void put(String s, Object o) throws Exception {
+	public void put(String s, Object o) throws Throwable {
 		virtualMachine.putGlobal(s, o);
 	}
 	public GSVM getVM() {

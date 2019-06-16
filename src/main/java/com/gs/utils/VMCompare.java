@@ -3,11 +3,11 @@ package com.gs.utils;
 import java.util.ArrayDeque;
 
 public class VMCompare {
-	public int Compare(ArrayDeque<Object> s) throws Exception {
+	public int Compare(ArrayDeque<Object> s) throws Throwable {
 		VMPair p = fetch(s);
 		return Compare(p.l, p.r);
 	}
-	public VMPair fetch(ArrayDeque<Object> s) throws Exception {
+	public VMPair fetch(ArrayDeque<Object> s) throws Throwable {
 		IAccessor acc1 = ((IAccessor)s.pop());
 		IAccessor acc2 = ((IAccessor)s.pop());
 		Object r = acc1.get();
@@ -17,7 +17,7 @@ public class VMCompare {
 		return new VMPair(l, r);
 	}
 	@SuppressWarnings("unchecked")
-	public int Compare(Object l, Object r) throws Exception {
+	public int Compare(Object l, Object r) throws Throwable {
 		if (l instanceof Number && r instanceof Number) {
 			double lhs = ((Number)l).doubleValue();
 			double rhs = ((Number)r).doubleValue();
@@ -30,7 +30,7 @@ public class VMCompare {
 	}
 	public static final VMCompare EQUAL = new VMCompare() {
 		@SuppressWarnings("unchecked")
-		public int Compare(ArrayDeque<Object> s) throws Exception {
+		public int Compare(ArrayDeque<Object> s) throws Throwable {
 			VMPair p = fetch(s);
 			if (p.l == null || p.r == null) {
 				if (p.l == null && p.r == null) {
